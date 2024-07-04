@@ -1,0 +1,397 @@
+select * from customers;
+select * from brands;
+select * from categories;
+select * from order_items;
+select * from orders;
+select * from products;
+select * from staff;
+select * from stocks;
+select * from stores;
+
+-- drop phone column (too many null entries)
+ALTER TABLE customers
+DROP COLUMN phone;
+
+-- 
+SELECT CONCAT(first_name, ' ', last_name) AS Customers, city
+FROM customers;
+
+-- joining tables
+SELECT * 
+from customers c
+join orders o
+where c.customer_id = o.customer_id;
+
+-- How many orders have each customer placed
+SELECT c.first_name, c.last_name, COUNT(o.order_id) AS order_count
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+GROUP BY c.first_name, c.last_name
+ORDER BY order_count DESC;
+
+-- Number of orders placed by city
+SELECT c.city, COUNT(o.order_id) AS total_orders
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+GROUP BY c.city
+ORDER BY total_orders DESC;
+
+-- 
+SELECT c.first_name, c.last_name, o.order_id, o.order_date, o.required_date, o.shipped_date
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+WHERE o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+ORDER BY o.order_date;
+
+-- which cities have the most customers
+SELECT city, COUNT(*) AS customer_count
+FROM customers
+GROUP BY city
+ORDER BY customer_count DESC;
+
+-- How many orders were placed but not yet shipped?
+SELECT COUNT(*) AS unshipped_orders
+FROM orders
+WHERE shipped_date IS NULL;
+
+-- Which customers have placed the most recent orders?
+SELECT c.first_name, c.last_name, o.order_date
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+ORDER BY o.order_date DESC
+LIMIT 10;
+
+
+SELECT 
+    c.last_name, 
+    c.first_name, 
+    o.order_date
+FROM 
+    customers c
+JOIN 
+    orders o ON c.customer_id = o.customer_id
+WHERE 
+    o.order_date BETWEEN '2016-01-01' AND '2016-12-31';
+
+
+-- find the category of low priced products
+SELECT product_name, list_price, category_name
+from categories, (
+	SELECT * 
+    from products
+    where list_price < 500) low_priced_products
+where categories.category_id = low_priced_products.category_id;
+
+SELECT * from customers, (
+SELECT * from orders
+where required_date != shipped_date
+) buys
+where customers.customer_id = buys.customer_id;
+
+-- 
+SELECT 
+    c.last_name, 
+    c.first_name, 
+    COUNT(o.order_id) AS order_count
+FROM 
+    customers c
+JOIN 
+    orders o ON c.customer_id = o.customer_id
+WHERE 
+    o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+GROUP BY 
+    c.customer_id, c.last_name, c.first_name
+HAVING 
+    COUNT(o.order_id) > 1;
+
+-- total revenue generated from each customer 
+SELECT 
+    c.last_name, 
+    c.first_name, 
+    SUM(oi.quantity * oi.list_price * (1 - oi.discount)) AS total_revenue
+FROM 
+    customers c
+JOIN 
+    orders o ON c.customer_id = o.customer_id
+JOIN 
+    order_items oi ON o.order_id = oi.order_id
+WHERE 
+    o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+GROUP BY 
+    c.customer_id, c.last_name, c.first_name
+ORDER BY total_revenue DESC;
+
+-- Which Top 10 cities generated the most revenue in 2018
+SELECT 
+    c.city, 
+    SUM(oi.quantity * oi.list_price * (1 - oi.discount)) AS total_revenue
+FROM 
+    customers c
+JOIN 
+    orders o ON c.customer_id = o.customer_id
+JOIN 
+    order_items oi ON o.order_id = oi.order_id
+WHERE 
+    o.order_date BETWEEN '2018-01-01' AND '2018-12-31'
+GROUP BY 
+    c.customer_id, c.city
+ORDER BY total_revenue DESC
+LIMIT 10;
+
+-- Which customers purchased a specific product - Pure Cycles Vine 8-Speed - 2016
+SELECT 
+    c.last_name, 
+    c.first_name
+FROM 
+    customers c
+JOIN 
+    orders o ON c.customer_id = o.customer_id
+JOIN 
+    order_items oi ON o.order_id = oi.order_id
+WHERE 
+    oi.product_id = 17
+GROUP BY 
+    c.customer_id, c.last_name, c.first_name;
+
+-- Product Sale Analysis
+-- What are the top-selling products 0f 2016?
+SELECT 
+    p.product_name, 
+    SUM(oi.quantity) AS total_quantity_sold
+FROM 
+    products p
+JOIN 
+    order_items oi ON p.product_id = oi.product_id
+JOIN 
+    orders o ON oi.order_id = o.order_id
+WHERE 
+    o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+GROUP BY 
+    p.product_name
+ORDER BY 
+    total_quantity_sold DESC;
+
+-- Which products generated the highest revenue in 2016?
+SELECT 
+    p.product_name, 
+    SUM(oi.quantity * oi.list_price * (1 - oi.discount)) AS total_revenue
+FROM 
+    products p
+JOIN 
+    order_items oi ON p.product_id = oi.product_id
+JOIN 
+    orders o ON oi.order_id = o.order_id
+WHERE 
+    o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+GROUP BY 
+    p.product_name
+ORDER BY 
+    total_revenue DESC;
+
+
+-- Average
+SELECT 
+    p.product_name, 
+    AVG(oi.discount) AS average_discount
+FROM 
+    products p
+JOIN 
+    order_items oi ON p.product_id = oi.product_id
+GROUP BY 
+    p.product_name
+ORDER BY average_discount DESC;
+
+-- Brand and Category Analysis
+-- What is the total revenue generated by each brand in 2016?
+SELECT 
+    b.brand_name, 
+    SUM(oi.quantity * oi.list_price * (1 - oi.discount)) AS total_revenue
+FROM 
+    brands b
+JOIN 
+    products p ON b.brand_id = p.brand_id
+JOIN 
+    order_items oi ON p.product_id = oi.product_id
+JOIN 
+    orders o ON oi.order_id = o.order_id
+WHERE 
+    o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+GROUP BY 
+    b.brand_name
+ORDER BY total_revenue;
+
+SELECT 
+    c.category_name, 
+    SUM(oi.quantity) AS total_quantity_sold
+FROM 
+    categories c
+JOIN 
+    products p ON c.category_id = p.category_id
+JOIN 
+    order_items oi ON p.product_id = oi.product_id
+GROUP BY 
+    c.category_name
+ORDER BY 
+    total_quantity_sold DESC;
+    
+SELECT 
+    AVG(DATEDIFF(o.shipped_date, o.order_date)) AS average_shipping_time
+FROM 
+    orders o
+WHERE 
+    o.shipped_date IS NOT NULL;
+
+SELECT 
+    p.product_name, 
+    AVG(DATEDIFF(o.required_date, o.order_date)) AS average_lead_time
+FROM 
+    products p
+JOIN 
+    order_items oi ON p.product_id = oi.product_id
+JOIN 
+    orders o ON oi.order_id = o.order_id
+GROUP BY 
+    p.product_name
+ORDER BY 
+    average_lead_time DESC;
+    
+    
+-- subqueries
+-- Who placed the most orders in 2016?
+SELECT first_name, last_name
+FROM customers
+WHERE customer_id IN (
+    SELECT customer_id
+    FROM orders
+    WHERE order_date BETWEEN '2016-01-01' AND '2016-12-31'
+    GROUP BY orders.customer_id
+    ORDER BY COUNT(orders.order_id) DESC
+)
+LIMIT 1;
+
+-- Which customers have placed orders worth 20000 - 30000?
+select first_name, last_name
+from customers 
+where customer_id in (
+	select customer_id
+    from orders
+    join order_items on orders.order_id = order_items.order_id
+    group by customer_id
+    having sum(quantity * list_price * (1 - discount)) between 20000 and 30000);
+    
+-- Who were the highest spenders in the first quater of 2016?
+SELECT c.first_name, c.last_name, first_qtr_orders.spent
+FROM customers c
+JOIN (
+    SELECT o.customer_id, SUM(oi.quantity * oi.list_price) AS spent
+    FROM orders o
+    JOIN order_items oi ON o.order_id = oi.order_id
+    WHERE o.order_date BETWEEN '2016-01-01' AND '2016-03-31'
+    GROUP BY o.customer_id
+) AS first_qtr_orders ON c.customer_id = first_qtr_orders.customer_id
+ORDER BY first_qtr_orders.spent DESC
+LIMIT 10;
+
+-- Which products had the highest sales in 2016?
+SELECT product_name
+FROM products
+WHERE product_id IN (
+    SELECT product_id
+    FROM order_items
+    JOIN orders ON order_items.order_id = orders.order_id
+    WHERE order_date BETWEEN '2016-01-01' AND '2016-12-31'
+    GROUP BY product_id
+    ORDER BY SUM(quantity * list_price * (1 - discount)) DESC
+);
+
+-- What is the most popular product category based on quantity sold
+SELECT category_id, category_name 
+FROM categories
+WHERE category_id = (
+    SELECT p.category_id
+    FROM products p 
+    JOIN order_items oi ON p.product_id = oi.product_id
+    GROUP BY p.category_id
+    ORDER BY SUM(oi.quantity) DESC
+    LIMIT 1
+);
+
+--
+SELECT p.product_name, f.process_time
+FROM products p
+JOIN order_items oi ON p.product_id = oi.product_id
+JOIN orders o ON oi.order_id = o.order_id
+JOIN (
+    SELECT sub_o.order_id, MAX(DATEDIFF(sub_o.shipped_date, sub_o.order_date)) as process_time
+    FROM orders sub_o
+    GROUP BY sub_o.order_id
+    ORDER BY process_time DESC
+) as f ON o.order_id = f.order_id
+ORDER BY f.process_time DESC
+LIMIT 5;
+
+-- What is the total revenue for each brand in 2016?
+SELECT b.brand_id, brand_name, (
+    SELECT SUM(oi.quantity * p.list_price * (1 - oi.discount))
+    FROM order_items oi
+    JOIN products p ON oi.product_id = p.product_id
+    JOIN orders o ON oi.order_id = o.order_id
+    WHERE p.brand_id = b.brand_id
+    AND o.order_date BETWEEN '2016-01-01' AND '2016-12-31'
+) AS total_revenue
+FROM brands b;
+
+-- which products have never been sold
+SELECT product_name
+FROM products
+WHERE product_id NOT IN (
+    SELECT DISTINCT product_id
+    FROM order_items
+);
+
+SELECT oi1.product_id AS ProductID1, oi2.product_id AS ProductID2, COUNT(*) AS Frequency
+FROM order_items oi1
+JOIN order_items oi2 ON oi1.order_id = oi2.order_id AND oi1.product_id <> oi2.product_id
+GROUP BY oi1.product_id, oi2.product_id
+ORDER BY Frequency DESC;
+
+SELECT 
+    oi1.product_id AS ProductID1, 
+    p1.product_name AS Product1, 
+    oi2.product_id AS ProductID2, 
+    p2.product_name AS Product2, 
+    COUNT(*) AS Frequency
+FROM 
+    order_items oi1
+JOIN 
+    order_items oi2 ON oi1.order_id = oi2.order_id AND oi1.product_id <> oi2.product_id
+JOIN 
+    products p1 ON oi1.product_id = p1.product_id
+JOIN 
+    products p2 ON oi2.product_id = p2.product_id
+GROUP BY 
+    oi1.product_id, oi2.product_id, p1.product_name, p2.product_name
+ORDER BY 
+    Frequency DESC;
+
+-- self-joins
+-- Which products are frequently bought together in the same order?
+SELECT 
+    oi1.product_id AS ProductID1, 
+    p1.product_name AS Product1, 
+    oi2.product_id AS ProductID2, 
+    p2.product_name AS Product2, 
+    COUNT(*) AS Frequency
+FROM 
+    order_items oi1
+JOIN 
+    order_items oi2 ON oi1.order_id = oi2.order_id AND oi1.product_id < oi2.product_id
+JOIN 
+    products p1 ON oi1.product_id = p1.product_id
+JOIN 
+    products p2 ON oi2.product_id = p2.product_id
+GROUP BY 
+    oi1.product_id, oi2.product_id, p1.product_name, p2.product_name
+ORDER BY 
+    Frequency DESC
+LIMIT 10;
